@@ -1,3 +1,0 @@
-C:/Users/juanb/OneDrive/Documents/GitHub/Taller2EDD/build/CMakeFiles/Taller1EDD.dir
-C:/Users/juanb/OneDrive/Documents/GitHub/Taller2EDD/build/CMakeFiles/edit_cache.dir
-C:/Users/juanb/OneDrive/Documents/GitHub/Taller2EDD/build/CMakeFiles/rebuild_cache.dir

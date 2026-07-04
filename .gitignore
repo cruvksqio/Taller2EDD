@@ -1,2 +1,26 @@
-CMakeLists.txt/
+# Build directories
+build/
+cmake-build-debug/
+cmake-build-release/
+
+# IDE
 .idea/
+.vscode/
+*.sln
+*.vcxproj*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+*.o
+*.a
+*.lib
+*.dll
+*.exe
+*.so
+*.dylib
+*.cfg
+output.txt
+status.cfg
