@@ -2,13 +2,17 @@
 #define REPRODUCTOR_HPP
 
 #include <string>
+#include <vector>
 #include "../Structure/SongList.hpp"
+#include "../Structure/Trie.hpp"
 #include "../Clases/Cancion.hpp"
 
 class Reproductor {
 private:
     SongList<Cancion> registroTotal;      // Todas las canciones cargadas
     SongList<Cancion> listaReproduccion;  // Cola de reproducción actual
+    Trie<int> trieNombre;                 // Trie para búsqueda por nombre
+    Trie<int> trieArtista;                // Trie para búsqueda por artista
 
     // Variables de estado
     bool reproduciendo;                   // true = reproduciendo, false = pausa/detenido
@@ -24,6 +28,8 @@ private:
     void cargarCanciones();
     void guardarCanciones();
     void mezclarListaReproduccion();
+    void reconstruirTries();
+    std::vector<Cancion*> buscarCancionesPorTermino(const std::string& termino);
 
 public:
     Reproductor();
@@ -41,6 +47,7 @@ public:
     void toggleRepeat();                  // R - Cambiar modo repetición
     void seePlaylist();                   // A - Ver lista de reproducción actual
     void seeSongList();                   // L - Listado de canciones
+    void searchSongs();                   // F - Búsqueda de canciones/artistas
 
     // Getters para mostrar el estado
     std::string getEstadoReproduccion() const;

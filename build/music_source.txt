@@ -1,0 +1,50 @@
+1,Blinding Lights,The Weeknd,After Hours,2020,200,C:\music\blinding_lights.mp3
+2,Shape of You,Ed Sheeran,Divide,2017,233,C:\music\shape_of_you.mp3
+3,Levitating,Dua Lipa,Future Nostalgia,2020,203,C:\music\levitating.mp3
+4,Bohemian Rhapsody,Queen,A Night at the Opera,1975,354,C:\music\bohemian.mp3
+5,Bad Guy,Billie Eilish,When We All Fall Asleep,2019,194,C:\music\bad_guy.mp3
+6,Rolling in the Deep,Adele,21,2011,228,C:\music\rolling_deep.mp3
+7,Uptown Funk,Bruno Mars,Uptown Special,2014,270,C:\music\uptown_funk.mp3
+8,Havana,Camila Cabello,Camila,2018,217,C:\music\havana.mp3
+9,Smells Like Teen Spirit,Nirvana,Nevermind,1991,301,C:\music\teen_spirit.mp3
+10,Someone Like You,Adele,21,2011,285,C:\music\someone_like_you.mp3
+11,Stay,The Kid LAROI,Fuck Love,2021,141,C:\music\stay.mp3
+12,Perfect,Ed Sheeran,Divide,2017,263,C:\music\perfect.mp3
+13,Senorita,Shawn Mendes,Romance,2019,191,C:\music\senorita.mp3
+14,Thunder,Imagine Dragons,Evolve,2017,187,C:\music\thunder.mp3
+15,Radioactive,Imagine Dragons,Night Visions,2012,186,C:\music\radioactive.mp3
+16,Counting Stars,OneRepublic,Native,2013,257,C:\music\counting_stars.mp3
+17,Hello,Adele,25,2015,295,C:\music\hello.mp3
+18,Roar,Katy Perry,Prism,2013,222,C:\music\roar.mp3
+19,Firework,Katy Perry,Teenage Dream,2010,228,C:\music\firework.mp3
+20,Shake It Off,Taylor Swift,1989,2014,242,C:\music\shake_it_off.mp3
+21,Blank Space,Taylor Swift,1989,2014,231,C:\music\blank_space.mp3
+22,Lose Yourself,Eminem,8 Mile,2002,326,C:\music\lose_yourself.mp3
+23,God's Plan,Drake,Scorpion,2018,198,C:\music\gods_plan.mp3
+24,In My Feelings,Drake,Scorpion,2018,217,C:\music\in_my_feelings.mp3
+25,Sunflower,Post Malone,Hollywood's Bleeding,2019,158,C:\music\sunflower.mp3
+26,Circles,Post Malone,Hollywood's Bleeding,2019,215,C:\music\circles.mp3
+27,Memories,Maroon 5,Jordi,2019,189,C:\music\memories.mp3
+28,Sugar,Maroon 5,V,2014,235,C:\music\sugar.mp3
+29,Photograph,Ed Sheeran,Multiply,2014,258,C:\music\photograph.mp3
+30,Let Her Go,Passenger,All the Little Lights,2012,252,C:\music\let_her_go.mp3
+31,Thinking Out Loud,Ed Sheeran,Multiply,2014,281,C:\music\thinking_out_loud.mp3
+32,All of Me,John Legend,Love in the Future,2013,269,C:\music\all_of_me.mp3
+33,Wake Me Up,Avicii,True,2013,247,C:\music\wake_me_up.mp3
+34,Levels,Avicii,Levels,2011,227,C:\music\levels.mp3
+35,Closer,The Chainsmokers,Collage,2016,244,C:\music\closer.mp3
+36,Don't Let Me Down,The Chainsmokers,Collage,2016,208,C:\music\dont_let_me_down.mp3
+37,Faded,Alan Walker,Different World,2015,212,C:\music\faded.mp3
+38,On My Way,Alan Walker,Different World,2019,198,C:\music\on_my_way.mp3
+39,Rockstar,DaBaby,Kirk,2019,181,C:\music\rockstar.mp3
+40,Industry Baby,Lil Nas X,Montero,2021,212,C:\music\industry_baby.mp3
+41,Montero,Lil Nas X,Montero,2021,137,C:\music\montero.mp3
+42,Peaches,Justin Bieber,Justice,2021,198,C:\music\peaches.mp3
+43,Baby,Justin Bieber,My World 2.0,2010,214,C:\music\baby.mp3
+44,Sorry,Justin Bieber,Purpose,2015,200,C:\music\sorry.mp3
+45,Despacito,Luis Fonsi,Vida,2017,229,C:\music\despacito.mp3
+46,Bailando,Enrique Iglesias,Sex and Love,2014,251,C:\music\bailando.mp3
+47,Vivir Mi Vida,Marc Anthony,3.0,2013,252,C:\music\vivir_mi_vida.mp3
+48,Gasolina,Daddy Yankee,Barrio Fino,2004,192,C:\music\gasolina.mp3
+49,Taki Taki,DJ Snake,Carte Blanche,2018,212,C:\music\taki_taki.mp3
+50,Lean On,Major Lazer,Peace Is the Mission,2015,176,C:\music\lean_on.mp3

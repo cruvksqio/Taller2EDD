@@ -123,6 +123,15 @@ public:
         }
     }
 
+    template <typename Func>
+    void forEach(Func callback) const {
+        Nodo<T>* temp = cabeza;
+        while (temp != nullptr) {
+            callback(temp->dato);
+            temp = temp->siguiente;
+        }
+    }
+
     // Método para saltar a una canción específica
     bool saltarA(int posicion) {
         if (posicion < 1 || posicion > longitud) {
@@ -136,6 +145,32 @@ public:
 
         actual = temp;
         return true;
+    }
+
+    T* obtenerPorPosicion(int posicion) {
+        if (posicion < 1 || posicion > longitud) {
+            return nullptr;
+        }
+
+        Nodo<T>* temp = cabeza;
+        for (int i = 1; i < posicion; ++i) {
+            temp = temp->siguiente;
+        }
+
+        return &(temp->dato);
+    }
+
+    const T* obtenerPorPosicion(int posicion) const {
+        if (posicion < 1 || posicion > longitud) {
+            return nullptr;
+        }
+
+        Nodo<T>* temp = cabeza;
+        for (int i = 1; i < posicion; ++i) {
+            temp = temp->siguiente;
+        }
+
+        return &(temp->dato);
     }
 
     // Método para buscar por ID
@@ -197,7 +232,6 @@ public:
             temp = temp->siguiente;
         }
 
-
         for (int i = longitud - 1; i > 0; i--) {
             int j = rand() % (i + 1);
             T tempElemento = elementos[i];
@@ -207,8 +241,8 @@ public:
 
         // Reconstruir la lista con los elementos mezclados
         vaciar();
-        for (int i = 0; i < longitud + 1; i++) {  // Nota: necesitamos reconstruir
-            // Esta implementación necesita ajuste según el contexto
+        for (int i = 0; i < longitud; i++) {
+            agregarAlFinal(elementos[i]);
         }
 
         delete[] elementos;

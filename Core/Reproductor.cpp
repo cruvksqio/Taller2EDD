@@ -4,6 +4,8 @@
 #include <sstream>
 #include <cstdlib>
 #include <ctime>
+#include <algorithm>
+#include <limits>
 
 Reproductor::Reproductor()
     : reproduciendo(false), modoAleatorio(false), modoRepeticion(0),
@@ -13,7 +15,7 @@ Reproductor::Reproductor()
 
 Reproductor::Reproductor(const std::string& archivoMusica, const std::string& archivoConfig)
     : reproduciendo(false), modoAleatorio(false), modoRepeticion(0),
-      ultimoId(0), archivoMusica(archivoMusica), archivoConfig(archivoConfig) {
+      ultimoId(0), archivoMusica(archivoMusica), archivoConfig(archivoConfig), trieNombre(), trieArtista() {
     srand(time(nullptr));
 }
 
@@ -63,6 +65,7 @@ void Reproductor::cargarCanciones() {
     }
 
     archivo.close();
+    reconstruirTries();
 }
 
 void Reproductor::guardarCanciones() {
@@ -72,43 +75,65 @@ void Reproductor::guardarCanciones() {
         std::cerr << "Error: No se pudo guardar el archivo " << archivoMusica << "\n";
         return;
     }
-    // PARTE INCOMPLETA, HACER
-    SongList<Cancion> temp;
+
+    registroTotal.forEach([&archivo](const Cancion& cancion) {
+        archivo << cancion.toString() << "\n";
+    });
 
     archivo.close();
 }
 
 void Reproductor::mezclarListaReproduccion() {
     if (listaReproduccion.obtenerLongitud() <= 1) return;
+    listaReproduccion.mezclar();
+}
 
-    // Guardar la canción actual
-    Cancion* cancionActual = listaReproduccion.obtenerActual();
-    if (cancionActual == nullptr) return;
+void Reproductor::reconstruirTries() {
+    trieNombre.clearAll();
+    trieArtista.clearAll();
 
-    int idActual = cancionActual->getId();
+    int index = 1;
+    registroTotal.forEach([this, &index](const Cancion& cancion) {
+        trieNombre.insert(cancion.getNombre(), index);
+        trieArtista.insert(cancion.getArtista(), index);
+        index++;
+    });
+}
 
-    // Crear array temporal con las canciones (excepto la actual)
-    int longitud = listaReproduccion.obtenerLongitud();
-    Cancion* canciones = new Cancion[longitud];
-    int index = 0;
-
-    // Extraer todas las canciones a un array
-
-    // Mezclar usando Fisher-Yates
-    for (int i = longitud - 1; i > 0; i--) {
-        int j = rand() % (i + 1);
-        Cancion temp = canciones[i];
-        canciones[i] = canciones[j];
-        canciones[j] = temp;
+std::vector<Cancion*> Reproductor::buscarCancionesPorTermino(const std::string& termino) {
+    std::vector<Cancion*> resultados;
+    if (termino.empty()) {
+        return resultados;
     }
 
-    // Reconstruir la lista
-    listaReproduccion.vaciar();
-    for (int i = 0; i < longitud; i++) {
-        listaReproduccion.agregarAlFinal(canciones[i]);
+    std::string busqueda = termino;
+    std::transform(busqueda.begin(), busqueda.end(), busqueda.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    std::vector<int> idsNombre = trieNombre.searchPrefix(busqueda);
+    std::vector<int> idsArtista = trieArtista.searchPrefix(busqueda);
+    std::vector<int> idsUnicos;
+
+    for (int id : idsNombre) {
+        if (std::find(idsUnicos.begin(), idsUnicos.end(), id) == idsUnicos.end()) {
+            idsUnicos.push_back(id);
+        }
+    }
+    for (int id : idsArtista) {
+        if (std::find(idsUnicos.begin(), idsUnicos.end(), id) == idsUnicos.end()) {
+            idsUnicos.push_back(id);
+        }
     }
 
-    delete[] canciones;
+    for (int posicion : idsUnicos) {
+        Cancion* cancion = registroTotal.obtenerPorPosicion(posicion);
+        if (cancion != nullptr) {
+            resultados.push_back(cancion);
+        }
+    }
+
+    return resultados;
 }
 
 // ============ Main methods!!! ============
@@ -183,12 +208,6 @@ void Reproductor::guardarEstado() {
     archivo << "ESTADO_REPRODUCCION " << (reproduciendo ? "1" : "0") << "\n";
     archivo << "COLA_PENDIENTE " << listaReproduccion.obtenerIdsComoString() << "\n";
 
-    if (!archivo.is_open()) {
-        std::cout << "Archivo no encontrado en la raiz. Creando uno nuevo...\n";
-        guardarEstado(); // Esto creará el archivo en la carpeta del main
-        return;
-    }
-
     archivo.close();
 }
 
@@ -199,11 +218,12 @@ bool Reproductor::play() {
 
     // Si estamos iniciando reproducción y no hay canción actual, tomar la primera
     if (reproduciendo && listaReproduccion.obtenerActual() == nullptr) {
-        // Si la lista de reproducción está vacía, llenarla con todas las canciones
         if (listaReproduccion.estaVacia()) {
-            // Clonar registroTotal a listaReproduccion
-            SongList<Cancion> temp;
-            // Implementar clonacion
+            listaReproduccion.clonarDesde(registroTotal);
+            if (modoAleatorio) {
+                listaReproduccion.mezclar();
+            }
+            listaReproduccion.irAlInicio();
         }
     }
 
@@ -438,6 +458,65 @@ void Reproductor::seeSongList() {
     }
 
     guardarEstado();
+}
+
+void Reproductor::searchSongs() {
+    if (registroTotal.estaVacia()) {
+        std::cout << "No hay canciones registradas.\n";
+        return;
+    }
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "\n=== BUSCAR CANCIONES Y/O ARTISTAS ===\n";
+    std::cout << "Ingrese término de búsqueda: ";
+
+    std::string termino;
+    std::getline(std::cin, termino);
+
+    std::vector<Cancion*> resultados = buscarCancionesPorTermino(termino);
+
+    if (resultados.empty()) {
+        std::cout << "No se encontró ninguna canción o artista con ese término.\n";
+        return;
+    }
+
+    std::cout << "\nResultados de búsqueda:\n";
+    for (size_t i = 0; i < resultados.size(); ++i) {
+        std::cout << (i + 1) << ". ";
+        resultados[i]->imprimirDatos();
+    }
+
+    std::cout << "\nIngrese el número de la canción para reproducirla, o V para volver: ";
+    std::string opcion;
+    std::getline(std::cin, opcion);
+
+    if (!opcion.empty() && (opcion[0] == 'V' || opcion[0] == 'v')) {
+        return;
+    }
+
+    try {
+        int seleccion = std::stoi(opcion);
+        if (seleccion >= 1 && seleccion <= static_cast<int>(resultados.size())) {
+            Cancion* cancionSeleccionada = resultados[seleccion - 1];
+            listaReproduccion.vaciar();
+            listaReproduccion.agregarAlFinal(*cancionSeleccionada);
+            registroTotal.irAlInicio();
+            while (Cancion* actual = registroTotal.obtenerActual()) {
+                if (actual->getId() != cancionSeleccionada->getId()) {
+                    listaReproduccion.agregarAlFinal(*actual);
+                }
+                if (!registroTotal.avanzar()) break;
+            }
+            reproduciendo = true;
+            guardarEstado();
+            std::cout << "Reproduciendo: " << cancionSeleccionada->getNombre() << " - "
+                      << cancionSeleccionada->getArtista() << "\n";
+        } else {
+            std::cout << "Selección fuera de rango.\n";
+        }
+    } catch (const std::exception&) {
+        std::cout << "Entrada inválida. Use un número válido o V.\n";
+    }
 }
 
 // ============ GETTERS DE ESTADO ============

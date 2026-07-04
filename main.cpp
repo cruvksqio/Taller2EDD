@@ -37,14 +37,18 @@ void mostrarMenuPrincipal(Reproductor& rep) {
     std::cout << "S - Activar/Desactivar modo aleatorio\n";
     std::cout << "R - Repeticion (Desactivado/Repetir una/Repetir todas)\n";
     std::cout << "A - Ver lista de reproduccion actual\n";
+    std::cout << "F - Búsqueda de canciones y/o artistas\n";
     std::cout << "L - Listado de canciones\n";
     std::cout << "X - Salir\n";
     std::cout << "Ingrese opcion: ";
 }
 
 int main() {
+    std::cout << "Iniciando reproductor...\n";
     Reproductor rep("music_source.txt", "status.cfg");
+    std::cout << "Instancia de reproductor creada. Cargando estado...\n";
     rep.cargarEstado();
+    std::cout << "Carga de estado finalizada.\n";
 
     bool ejecutando = true;
     std::string opcion;
@@ -53,7 +57,10 @@ int main() {
         limpiarConsola();
         mostrarMenuPrincipal(rep);
 
-        std::cin >> opcion;
+        if (!(std::cin >> opcion)) {
+            std::cout << "\nEntrada finalizada. Saliendo...\n";
+            break;
+        }
 
         // Convertir a mayúscula
         if (!opcion.empty()) {
@@ -78,6 +85,9 @@ int main() {
                 break;
             case 'A':
                 rep.seePlaylist();
+                break;
+            case 'F':
+                rep.searchSongs();
                 break;
             case 'L':
                 rep.seeSongList();
