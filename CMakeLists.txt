@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Taller1EDD)
+project(Taller2EDD)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -10,7 +10,7 @@ configure_file(
         COPYONLY
 )
 
-add_executable(Taller1EDD
+add_executable(Taller2EDD
         main.cpp
         Clases/Cancion.cpp
         Core/Reproductor.cpp
