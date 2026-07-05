@@ -14,6 +14,7 @@
 **Integrantes:**
 1.  **[Constantino Demostenes Bekios Canales]**
 2.  **[Fernando Andres Lagos Barahona]**
+3.  **[Nicolás Ignacio Bugueño Rementería]**
 
 ## Descripción
 
