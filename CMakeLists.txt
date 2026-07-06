@@ -14,5 +14,4 @@ add_executable(Taller2EDD
         main.cpp
         Clases/Cancion.cpp
         Core/Reproductor.cpp
-        Structure/Trie.hpp
 )

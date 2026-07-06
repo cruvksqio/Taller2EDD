@@ -132,6 +132,16 @@ public:
         }
     }
 
+    template <typename Func>
+    void forEach(Func callback) {
+        Nodo<T>* temp = cabeza;
+        while (temp != nullptr) {
+            callback(temp->dato);
+            temp = temp->siguiente;
+        }
+    }
+
+
     // Método para saltar a una canción específica
     bool saltarA(int posicion) {
         if (posicion < 1 || posicion > longitud) {

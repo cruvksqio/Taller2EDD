@@ -1,5 +1,6 @@
 #include "Reproductor.hpp"
 #include "../Structure/Heap.hpp"
+#include "../Structure/Avl.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,6 +33,18 @@ namespace {
                 return a.getTotalReproducciones() > b.getTotalReproducciones();
             }
             return a.getNombreArtista() < b.getNombreArtista();
+        }
+    };
+
+    struct ComparadorCancionPorArtistaYNombre {
+        bool operator()(Cancion* const& a, Cancion* const& b) const {
+            if (a->getArtista() != b->getArtista()) {
+                return a->getArtista() < b->getArtista();
+            }
+            if (a->getNombre() != b->getNombre()) {
+                return a->getNombre() < b->getNombre();
+            }
+            return a->getId() < b->getId();
         }
     };
 }
@@ -322,40 +335,27 @@ EntradaArtista* Reproductor::construirTopArtistas(int& cantidad) {
 
 Cancion** Reproductor::obtenerCancionesDeArtista(const std::string& artista, int& cantidad) {
     cantidad = 0;
-    int total = registroTotal.obtenerLongitud();
-    if (total == 0) return nullptr;
+    if (registroTotal.obtenerLongitud() == 0) return nullptr;
 
-    Cancion** temp = new Cancion*[total];
-    int encontrados = 0;
+    Avl<Cancion*, ComparadorCancionPorArtistaYNombre> A_artistas;
 
-    for (int i = 1; i <= total; ++i) {
-        Cancion* cancion = registroTotal.obtenerPorPosicion(i);
-        if (cancion != nullptr && cancion->getArtista() == artista) {
-            temp[encontrados++] = cancion;
+    registroTotal.forEach([&A_artistas, &artista](Cancion& cancion) {
+        if (cancion.getArtista() == artista) {
+            A_artistas.insertar(&cancion);
         }
-    }
+    });
 
-    if (encontrados == 0) {
-        delete[] temp;
-        return nullptr;
-    }
+    int encontrados = A_artistas.obtenerCantidad();
+    if (encontrados == 0) return nullptr;
 
-    // Orden alfabético por nombre de canción (inserción simple).
-    // NOTA: esto es un filtro provisional; lo ideal es que este listado
-    // por artista lo entregue el recorrido in-order del AVL (parte de Fer),
-    // que ya mantiene las canciones de cada artista ordenadas.
-    for (int i = 1; i < encontrados; ++i) {
-        Cancion* actual = temp[i];
-        int j = i - 1;
-        while (j >= 0 && temp[j]->getNombre() > actual->getNombre()) {
-            temp[j + 1] = temp[j];
-            --j;
-        }
-        temp[j + 1] = actual;
-    }
+    Cancion** resultado = new Cancion*[encontrados];
+    int indice = 0;
+    A_artistas.recorridoInOrden([&resultado, &indice](Cancion* const& cancion) {
+        resultado[indice++] = cancion;
+    });
 
-    cantidad = encontrados;
-    return temp;
+    cantidad = indice;
+    return resultado;
 }
 
 void Reproductor::mostrarTop10Canciones() {
