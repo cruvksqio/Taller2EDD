@@ -39,6 +39,7 @@ void mostrarMenuPrincipal(Reproductor& rep) {
     std::cout << "A - Ver lista de reproduccion actual\n";
     std::cout << "F - Búsqueda de canciones y/o artistas\n";
     std::cout << "L - Listado de canciones\n";
+    std::cout << "T - TOP 10 Artistas y Canciones\n";
     std::cout << "X - Salir\n";
     std::cout << "Ingrese opcion: ";
 }
@@ -91,6 +92,9 @@ int main() {
                 break;
             case 'L':
                 rep.seeSongList();
+                break;
+            case 'T':
+                rep.menuTop10();
                 break;
             case 'X':
                 ejecutando = false;

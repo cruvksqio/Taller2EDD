@@ -10,6 +10,7 @@ Cancion::Cancion() {
     this->anio = 0;
     this->duracion = 0;
     this->ruta = "";
+    this->reproducciones = 0;
 }
 
 // Constructor parametrizado
@@ -22,6 +23,7 @@ Cancion::Cancion(int id, std::string nombre, std::string artista, std::string al
     this->anio = anio;
     this->duracion = duracion;
     this->ruta = ruta;
+    this->reproducciones = 0;
 }
 
 // Implementación de Getters
@@ -32,6 +34,7 @@ std::string Cancion::getAlbum() const { return album; }
 int Cancion::getAnio() const { return anio; }
 int Cancion::getDuracion() const { return duracion; }
 std::string Cancion::getRuta() const { return ruta; }
+int Cancion::getReproducciones() const { return reproducciones; }
 
 // Implementación de Setters
 void Cancion::setId(int id) { this->id = id; }
@@ -41,6 +44,9 @@ void Cancion::setAlbum(std::string album) { this->album = album; }
 void Cancion::setAnio(int anio) { this->anio = anio; }
 void Cancion::setDuracion(int duracion) { this->duracion = duracion; }
 void Cancion::setRuta(std::string ruta) { this->ruta = ruta; }
+void Cancion::setReproducciones(int reproducciones) { this->reproducciones = reproducciones; }
+
+void Cancion::incrementarReproducciones() { this->reproducciones++; }
 
 // Metodo similar a toString que imprime datos
 void Cancion::imprimirDatos() const {

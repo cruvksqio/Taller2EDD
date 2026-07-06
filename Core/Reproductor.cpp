@@ -1,21 +1,52 @@
 #include "Reproductor.hpp"
+#include "../Structure/Heap.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <ctime>
-#include <algorithm>
+#include <cctype>
 #include <limits>
+
+namespace {
+    // Comparador para el Heap del TOP 10 de canciones: prioriza más
+    // reproducciones y, en caso de empate, orden alfabético por nombre
+    // y luego por artista (tal como exige la pauta).
+    struct ComparadorCancionPorReproducciones {
+        bool operator()(Cancion* const& a, Cancion* const& b) const {
+            if (a->getReproducciones() != b->getReproducciones()) {
+                return a->getReproducciones() > b->getReproducciones();
+            }
+            if (a->getNombre() != b->getNombre()) {
+                return a->getNombre() < b->getNombre();
+            }
+            return a->getArtista() < b->getArtista();
+        }
+    };
+
+    // Comparador para el Heap del TOP 10 de artistas: prioriza más
+    // reproducciones acumuladas y, en empate, orden alfabético del artista.
+    struct ComparadorArtistaPorReproducciones {
+        bool operator()(const EntradaArtista& a, const EntradaArtista& b) const {
+            if (a.getTotalReproducciones() != b.getTotalReproducciones()) {
+                return a.getTotalReproducciones() > b.getTotalReproducciones();
+            }
+            return a.getNombreArtista() < b.getNombreArtista();
+        }
+    };
+}
 
 Reproductor::Reproductor()
     : reproduciendo(false), modoAleatorio(false), modoRepeticion(0),
-      ultimoId(0), archivoMusica("music_source.txt"), archivoConfig("status.cfg") {
+      ultimoId(0), archivoMusica("music_source.txt"), archivoConfig("status.cfg"),
+      archivoRanking("song_ranking.txt") {
     srand(time(nullptr));
 }
 
 Reproductor::Reproductor(const std::string& archivoMusica, const std::string& archivoConfig)
     : reproduciendo(false), modoAleatorio(false), modoRepeticion(0),
-      ultimoId(0), archivoMusica(archivoMusica), archivoConfig(archivoConfig), trieNombre(), trieArtista() {
+      ultimoId(0), archivoMusica(archivoMusica), archivoConfig(archivoConfig),
+      archivoRanking("song_ranking.txt"), A_trieNombres(), A_trieArtistas() {
     srand(time(nullptr));
 }
 
@@ -66,6 +97,7 @@ void Reproductor::cargarCanciones() {
 
     archivo.close();
     reconstruirTries();
+    cargarRanking(); // Restaura los contadores de reproducciones guardados
 }
 
 void Reproductor::guardarCanciones() {
@@ -89,51 +121,443 @@ void Reproductor::mezclarListaReproduccion() {
 }
 
 void Reproductor::reconstruirTries() {
-    trieNombre.clearAll();
-    trieArtista.clearAll();
+    A_trieNombres.vaciarTodo();
+    A_trieArtistas.vaciarTodo();
 
-    int index = 1;
-    registroTotal.forEach([this, &index](const Cancion& cancion) {
-        trieNombre.insert(cancion.getNombre(), index);
-        trieArtista.insert(cancion.getArtista(), index);
-        index++;
+    // Se indexa por ID (no por posición): la posición cambia cuando se
+    // agregan o eliminan canciones, y el ID es estable.
+    registroTotal.forEach([this](const Cancion& cancion) {
+        A_trieNombres.insertar(cancion.getNombre(), cancion.getId());
+        A_trieArtistas.insertar(cancion.getArtista(), cancion.getId());
     });
 }
 
-std::vector<Cancion*> Reproductor::buscarCancionesPorTermino(const std::string& termino) {
-    std::vector<Cancion*> resultados;
+void Reproductor::reproducirCancionEspecifica(Cancion& cancion) {
+    // "cancion" viene de registroTotal (búsqueda, listado o Top10), así
+    // que registrarReproduccion incrementa la entrada maestra correcta.
+    registrarReproduccion(cancion);
+
+    listaReproduccion.vaciar();
+    listaReproduccion.clonarDesde(registroTotal);
+    listaReproduccion.mezclar();
+    listaReproduccion.saltarPorId(cancion.getId());
+    reproduciendo = true;
+}
+
+Cancion** Reproductor::buscarCancionesPorTermino(const std::string& termino, int& cantidadResultados) {
+    cantidadResultados = 0;
     if (termino.empty()) {
-        return resultados;
+        return nullptr;
     }
 
     std::string busqueda = termino;
-    std::transform(busqueda.begin(), busqueda.end(), busqueda.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
+    for (char& c : busqueda) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+
+    int totalCanciones = registroTotal.obtenerLongitud();
+    if (totalCanciones == 0) {
+        return nullptr;
+    }
+
+    // Arreglo dinámico crudo (no STL) para acumular IDs únicos encontrados.
+    int* idsEncontrados = new int[totalCanciones];
+    int cantidadIds = 0;
+
+    auto agregarIdUnico = [&idsEncontrados, &cantidadIds](int id) {
+        for (int i = 0; i < cantidadIds; ++i) {
+            if (idsEncontrados[i] == id) return;
+        }
+        idsEncontrados[cantidadIds++] = id;
+    };
+
+    A_trieNombres.buscarCoincidencias(busqueda, agregarIdUnico);
+    A_trieArtistas.buscarCoincidencias(busqueda, agregarIdUnico);
+
+    if (cantidadIds == 0) {
+        delete[] idsEncontrados;
+        return nullptr;
+    }
+
+    Cancion** resultados = new Cancion*[cantidadIds];
+    int encontrados = 0;
+    for (int i = 0; i < cantidadIds; ++i) {
+        Cancion* cancion = registroTotal.buscarPorId(idsEncontrados[i]);
+        if (cancion != nullptr) {
+            resultados[encontrados++] = cancion;
+        }
+    }
+
+    delete[] idsEncontrados;
+    cantidadResultados = encontrados;
+    return resultados;
+}
+
+// ============ RANKING TOP 10 (Heap) ============
+
+void Reproductor::cargarRanking() {
+    std::ifstream archivo(archivoRanking);
+
+    if (!archivo.is_open()) {
+        // No existe todavía: todas las canciones parten en 0 reproducciones
+        // (condición de borde: archivo inexistente).
+        return;
+    }
+
+    std::string linea;
+    while (std::getline(archivo, linea)) {
+        if (linea.empty()) continue;
+
+        std::stringstream ss(linea);
+        std::string idStr, contadorStr;
+
+        if (!std::getline(ss, idStr, ',')) continue;
+        if (!std::getline(ss, contadorStr, ',')) continue;
+
+        try {
+            int id = std::stoi(idStr);
+            int contador = std::stoi(contadorStr);
+            Cancion* cancion = registroTotal.buscarPorId(id);
+            if (cancion != nullptr) {
+                cancion->setReproducciones(contador);
+            }
+        } catch (const std::exception&) {
+            continue; // Línea corrupta: se ignora (condición de borde)
+        }
+    }
+
+    archivo.close();
+}
+
+void Reproductor::guardarRanking() {
+    std::ofstream archivo(archivoRanking);
+
+    if (!archivo.is_open()) {
+        std::cerr << "Error: No se pudo guardar " << archivoRanking << "\n";
+        return;
+    }
+
+    registroTotal.forEach([&archivo](const Cancion& cancion) {
+        archivo << cancion.getId() << "," << cancion.getReproducciones() << "\n";
     });
 
-    std::vector<int> idsNombre = trieNombre.searchPrefix(busqueda);
-    std::vector<int> idsArtista = trieArtista.searchPrefix(busqueda);
-    std::vector<int> idsUnicos;
+    archivo.close();
+}
 
-    for (int id : idsNombre) {
-        if (std::find(idsUnicos.begin(), idsUnicos.end(), id) == idsUnicos.end()) {
-            idsUnicos.push_back(id);
-        }
-    }
-    for (int id : idsArtista) {
-        if (std::find(idsUnicos.begin(), idsUnicos.end(), id) == idsUnicos.end()) {
-            idsUnicos.push_back(id);
-        }
-    }
+void Reproductor::registrarReproduccion(Cancion& cancion) {
+    cancion.incrementarReproducciones();
+    guardarRanking();
+}
 
-    for (int posicion : idsUnicos) {
-        Cancion* cancion = registroTotal.obtenerPorPosicion(posicion);
+Cancion** Reproductor::construirTopCanciones(int& cantidad) {
+    cantidad = 0;
+    int total = registroTotal.obtenerLongitud();
+    if (total == 0) return nullptr;
+
+    Heap<Cancion*, ComparadorCancionPorReproducciones> A_heapCanciones;
+    for (int i = 1; i <= total; ++i) {
+        Cancion* cancion = registroTotal.obtenerPorPosicion(i);
         if (cancion != nullptr) {
-            resultados.push_back(cancion);
+            A_heapCanciones.insertar(cancion);
         }
     }
 
-    return resultados;
+    int maximo = (total < 10) ? total : 10;
+    Cancion** top = new Cancion*[maximo];
+    int extraidos = 0;
+    Cancion* siguienteMejor = nullptr;
+    while (extraidos < maximo && A_heapCanciones.extraerMayor(siguienteMejor)) {
+        top[extraidos++] = siguienteMejor;
+    }
+
+    cantidad = extraidos;
+    return top;
+}
+
+EntradaArtista* Reproductor::construirTopArtistas(int& cantidad) {
+    cantidad = 0;
+    int total = registroTotal.obtenerLongitud();
+    if (total == 0) return nullptr;
+
+    // Arreglo temporal (a lo más "total" artistas distintos) para agrupar
+    // las reproducciones por artista antes de meterlas al Heap.
+    EntradaArtista* artistasUnicos = new EntradaArtista[total];
+    int cantidadArtistas = 0;
+
+    for (int i = 1; i <= total; ++i) {
+        Cancion* cancion = registroTotal.obtenerPorPosicion(i);
+        if (cancion == nullptr) continue;
+
+        bool encontrado = false;
+        for (int j = 0; j < cantidadArtistas; ++j) {
+            if (artistasUnicos[j].getNombreArtista() == cancion->getArtista()) {
+                artistasUnicos[j].sumarReproducciones(cancion->getReproducciones());
+                encontrado = true;
+                break;
+            }
+        }
+        if (!encontrado) {
+            artistasUnicos[cantidadArtistas++] =
+                EntradaArtista(cancion->getArtista(), cancion->getReproducciones());
+        }
+    }
+
+    Heap<EntradaArtista, ComparadorArtistaPorReproducciones> A_heapArtistas;
+    for (int i = 0; i < cantidadArtistas; ++i) {
+        A_heapArtistas.insertar(artistasUnicos[i]);
+    }
+    delete[] artistasUnicos;
+
+    int maximo = (cantidadArtistas < 10) ? cantidadArtistas : 10;
+    EntradaArtista* top = new EntradaArtista[maximo];
+    int extraidos = 0;
+    EntradaArtista siguienteMejor;
+    while (extraidos < maximo && A_heapArtistas.extraerMayor(siguienteMejor)) {
+        top[extraidos++] = siguienteMejor;
+    }
+
+    cantidad = extraidos;
+    return top;
+}
+
+Cancion** Reproductor::obtenerCancionesDeArtista(const std::string& artista, int& cantidad) {
+    cantidad = 0;
+    int total = registroTotal.obtenerLongitud();
+    if (total == 0) return nullptr;
+
+    Cancion** temp = new Cancion*[total];
+    int encontrados = 0;
+
+    for (int i = 1; i <= total; ++i) {
+        Cancion* cancion = registroTotal.obtenerPorPosicion(i);
+        if (cancion != nullptr && cancion->getArtista() == artista) {
+            temp[encontrados++] = cancion;
+        }
+    }
+
+    if (encontrados == 0) {
+        delete[] temp;
+        return nullptr;
+    }
+
+    // Orden alfabético por nombre de canción (inserción simple).
+    // NOTA: esto es un filtro provisional; lo ideal es que este listado
+    // por artista lo entregue el recorrido in-order del AVL (parte de Fer),
+    // que ya mantiene las canciones de cada artista ordenadas.
+    for (int i = 1; i < encontrados; ++i) {
+        Cancion* actual = temp[i];
+        int j = i - 1;
+        while (j >= 0 && temp[j]->getNombre() > actual->getNombre()) {
+            temp[j + 1] = temp[j];
+            --j;
+        }
+        temp[j + 1] = actual;
+    }
+
+    cantidad = encontrados;
+    return temp;
+}
+
+void Reproductor::mostrarTop10Canciones() {
+    int cantidad = 0;
+    Cancion** top = construirTopCanciones(cantidad);
+
+    std::cout << "\nRanking TOP " << cantidad << " Canciones más escuchadas:\n";
+    for (int i = 0; i < cantidad; ++i) {
+        std::cout << (i + 1) << ". [" << top[i]->getReproducciones() << "] "
+                  << top[i]->getNombre() << " - " << top[i]->getArtista() << "\n";
+    }
+
+    std::cout << "\nOpciones:\n";
+    std::cout << "R<num> - Reproducir canción seleccionada\n";
+    std::cout << "A<num> - Agregar canción seleccionada al final de la lista de reproducción actual\n";
+    std::cout << "A - Top 10 artistas más escuchados\n";
+    std::cout << "V - Volver al menú principal\n";
+    std::cout << "Ingrese Opción: ";
+
+    std::string opcion;
+    std::getline(std::cin, opcion);
+
+    if (opcion.empty()) {
+        delete[] top;
+        return;
+    }
+
+    // "A" sola (sin número) significa ir al TOP 10 de artistas.
+    if (opcion.size() == 1 && (opcion[0] == 'A' || opcion[0] == 'a')) {
+        delete[] top;
+        mostrarTop10Artistas();
+        return;
+    }
+
+    char letra = static_cast<char>(std::toupper(static_cast<unsigned char>(opcion[0])));
+
+    if (letra == 'R' || letra == 'A') {
+        try {
+            int num = std::stoi(opcion.substr(1));
+            if (num >= 1 && num <= cantidad) {
+                Cancion* seleccionada = top[num - 1];
+                if (letra == 'R') {
+                    reproducirCancionEspecifica(*seleccionada);
+                    std::cout << "\nReproduciendo: " << seleccionada->getNombre()
+                              << " - " << seleccionada->getArtista() << "\n";
+                } else {
+                    listaReproduccion.agregarAlFinal(*seleccionada);
+                    std::cout << "\nCanción agregada al final de la lista de reproducción.\n";
+                }
+                guardarEstado();
+            } else {
+                std::cout << "\nNúmero fuera de rango.\n";
+            }
+        } catch (const std::exception&) {
+            std::cout << "\nOpción inválida. Use el formato R<num> o A<num>.\n";
+        }
+    }
+    // "V" o cualquier otra opción: vuelve al menú principal.
+
+    delete[] top;
+}
+
+void Reproductor::mostrarTop10Artistas() {
+    int cantidad = 0;
+    EntradaArtista* top = construirTopArtistas(cantidad);
+
+    std::cout << "\nRanking TOP " << cantidad << " Artistas más escuchados:\n";
+    for (int i = 0; i < cantidad; ++i) {
+        std::cout << (i + 1) << ". [" << top[i].getTotalReproducciones() << "] "
+                  << top[i].getNombreArtista() << "\n";
+    }
+
+    std::cout << "\nOpciones:\n";
+    std::cout << "S<num> - Mostrar canciones del artista\n";
+    std::cout << "C - Top 10 canciones más escuchadas\n";
+    std::cout << "V - Volver al menú principal\n";
+    std::cout << "Ingrese Opción: ";
+
+    std::string opcion;
+    std::getline(std::cin, opcion);
+
+    if (opcion.empty()) {
+        delete[] top;
+        return;
+    }
+
+    char letra = static_cast<char>(std::toupper(static_cast<unsigned char>(opcion[0])));
+
+    if (letra == 'C' && opcion.size() == 1) {
+        delete[] top;
+        mostrarTop10Canciones();
+        return;
+    }
+
+    if (letra == 'S') {
+        try {
+            int num = std::stoi(opcion.substr(1));
+            if (num >= 1 && num <= cantidad) {
+                std::string artistaElegido = top[num - 1].getNombreArtista();
+                delete[] top;
+                mostrarCancionesDeArtista(artistaElegido);
+                return;
+            } else {
+                std::cout << "\nNúmero fuera de rango.\n";
+            }
+        } catch (const std::exception&) {
+            std::cout << "\nOpción inválida. Use el formato S<num>.\n";
+        }
+    }
+    // "V" o cualquier otra opción: vuelve al menú principal.
+
+    delete[] top;
+}
+
+void Reproductor::mostrarCancionesDeArtista(const std::string& artista) {
+    int cantidad = 0;
+    Cancion** canciones = obtenerCancionesDeArtista(artista, cantidad);
+
+    std::cout << "\nRanking TOP 10 Artistas más escuchados:\n";
+    std::cout << "Artista: " << artista << "\n";
+    for (int i = 0; i < cantidad; ++i) {
+        std::cout << (i + 1) << ". " << canciones[i]->getNombre() << "\n";
+    }
+
+    std::cout << "\nOpciones:\n";
+    std::cout << "R<num> - Reproducir canción seleccionada\n";
+    std::cout << "A<num> - Agregar canción seleccionada al final de la lista de reproducción actual\n";
+    std::cout << "V - Volver al listado de TOP 10 artistas\n";
+    std::cout << "X - Volver al menú principal\n";
+    std::cout << "Ingrese Opción: ";
+
+    std::string opcion;
+    std::getline(std::cin, opcion);
+
+    if (opcion.empty()) {
+        delete[] canciones;
+        return;
+    }
+
+    char letra = static_cast<char>(std::toupper(static_cast<unsigned char>(opcion[0])));
+
+    if (letra == 'V' && opcion.size() == 1) {
+        delete[] canciones;
+        mostrarTop10Artistas();
+        return;
+    }
+
+    if (letra == 'X') {
+        delete[] canciones;
+        return; // Vuelve al menú principal
+    }
+
+    if (letra == 'R' || letra == 'A') {
+        try {
+            int num = std::stoi(opcion.substr(1));
+            if (num >= 1 && num <= cantidad) {
+                Cancion* seleccionada = canciones[num - 1];
+                if (letra == 'R') {
+                    reproducirCancionEspecifica(*seleccionada);
+                    std::cout << "\nReproduciendo: " << seleccionada->getNombre()
+                              << " - " << seleccionada->getArtista() << "\n";
+                } else {
+                    listaReproduccion.agregarAlFinal(*seleccionada);
+                    std::cout << "\nCanción agregada al final de la lista de reproducción.\n";
+                }
+                guardarEstado();
+            } else {
+                std::cout << "\nNúmero fuera de rango.\n";
+            }
+        } catch (const std::exception&) {
+            std::cout << "\nOpción inválida. Use el formato R<num> o A<num>.\n";
+        }
+    }
+
+    delete[] canciones;
+}
+
+void Reproductor::menuTop10() {
+    if (registroTotal.estaVacia()) {
+        std::cout << "No hay canciones registradas.\n";
+        return;
+    }
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "\nRanking TOP\n";
+    std::cout << "C - Top 10 canciones más escuchadas\n";
+    std::cout << "A - Top 10 artistas más escuchados\n";
+    std::cout << "X - Salir\n";
+    std::cout << "Ingrese Opción: ";
+
+    std::string opcion;
+    std::getline(std::cin, opcion);
+    if (opcion.empty()) return;
+
+    char letra = static_cast<char>(std::toupper(static_cast<unsigned char>(opcion[0])));
+
+    if (letra == 'C') {
+        mostrarTop10Canciones();
+    } else if (letra == 'A') {
+        mostrarTop10Artistas();
+    }
+    // "X" o cualquier otra opción: vuelve al menú principal.
 }
 
 // ============ Main methods!!! ============
@@ -214,16 +638,30 @@ void Reproductor::guardarEstado() {
 bool Reproductor::play() {
     if (!hayCancionesDisponibles()) return false;
 
+    bool estabaSinCancion = (listaReproduccion.obtenerActual() == nullptr);
     reproduciendo = !reproduciendo;
 
     // Si estamos iniciando reproducción y no hay canción actual, tomar la primera
-    if (reproduciendo && listaReproduccion.obtenerActual() == nullptr) {
+    if (reproduciendo && estabaSinCancion) {
         if (listaReproduccion.estaVacia()) {
             listaReproduccion.clonarDesde(registroTotal);
             if (modoAleatorio) {
                 listaReproduccion.mezclar();
             }
             listaReproduccion.irAlInicio();
+        }
+
+        // Se cuenta como una reproducción nueva (no cada vez que se
+        // pausa/reanuda el mismo tema con W). Se busca la entrada
+        // maestra en registroTotal porque listaReproduccion solo
+        // contiene copias (clonarDesde), y el ranking se lee siempre
+        // desde registroTotal.
+        Cancion* cancionActual = listaReproduccion.obtenerActual();
+        if (cancionActual != nullptr) {
+            Cancion* cancionMaestra = registroTotal.buscarPorId(cancionActual->getId());
+            if (cancionMaestra != nullptr) {
+                registrarReproduccion(*cancionMaestra);
+            }
         }
     }
 
@@ -252,6 +690,13 @@ bool Reproductor::prev() {
     }
 
     reproduciendo = true;
+    Cancion* cancionActual = listaReproduccion.obtenerActual();
+    if (cancionActual != nullptr) {
+        Cancion* cancionMaestra = registroTotal.buscarPorId(cancionActual->getId());
+        if (cancionMaestra != nullptr) {
+            registrarReproduccion(*cancionMaestra);
+        }
+    }
     guardarEstado();
     return true;
 }
@@ -281,6 +726,13 @@ bool Reproductor::next() {
     }
 
     reproduciendo = true;
+    Cancion* cancionActual = listaReproduccion.obtenerActual();
+    if (cancionActual != nullptr) {
+        Cancion* cancionMaestra = registroTotal.buscarPorId(cancionActual->getId());
+        if (cancionMaestra != nullptr) {
+            registrarReproduccion(*cancionMaestra);
+        }
+    }
     guardarEstado();
     return true;
 }
@@ -445,12 +897,14 @@ void Reproductor::seeSongList() {
         ultimoId++;
         Cancion nueva(ultimoId, nombre, artista, album, anio, duracion, ruta);
         registroTotal.agregarAlFinal(nueva);
+        reconstruirTries(); // Actualiza la búsqueda con la nueva canción
 
         std::cout << "Cancion agregada exitosamente.\n";
     }
     else if (opcion[0] == 'D' || opcion[0] == 'd') {
         int num = std::stoi(opcion.substr(1));
         if (registroTotal.eliminarPorPosicion(num)) {
+            reconstruirTries(); // Actualiza la búsqueda tras la eliminación
             std::cout << "Cancion eliminada.\n";
         } else {
             std::cout << "Error al eliminar.\n";
@@ -466,56 +920,93 @@ void Reproductor::searchSongs() {
         return;
     }
 
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    std::cout << "\n=== BUSCAR CANCIONES Y/O ARTISTAS ===\n";
-    std::cout << "Ingrese término de búsqueda: ";
+    bool seguirBuscando = true;
 
-    std::string termino;
-    std::getline(std::cin, termino);
+    while (seguirBuscando) {
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "\nBusqueda de canciones\n";
+        std::cout << "Buscar canciones que contengan: ";
 
-    std::vector<Cancion*> resultados = buscarCancionesPorTermino(termino);
+        std::string termino;
+        std::getline(std::cin, termino);
 
-    if (resultados.empty()) {
-        std::cout << "No se encontró ninguna canción o artista con ese término.\n";
-        return;
-    }
-
-    std::cout << "\nResultados de búsqueda:\n";
-    for (size_t i = 0; i < resultados.size(); ++i) {
-        std::cout << (i + 1) << ". ";
-        resultados[i]->imprimirDatos();
-    }
-
-    std::cout << "\nIngrese el número de la canción para reproducirla, o V para volver: ";
-    std::string opcion;
-    std::getline(std::cin, opcion);
-
-    if (!opcion.empty() && (opcion[0] == 'V' || opcion[0] == 'v')) {
-        return;
-    }
-
-    try {
-        int seleccion = std::stoi(opcion);
-        if (seleccion >= 1 && seleccion <= static_cast<int>(resultados.size())) {
-            Cancion* cancionSeleccionada = resultados[seleccion - 1];
-            listaReproduccion.vaciar();
-            listaReproduccion.agregarAlFinal(*cancionSeleccionada);
-            registroTotal.irAlInicio();
-            while (Cancion* actual = registroTotal.obtenerActual()) {
-                if (actual->getId() != cancionSeleccionada->getId()) {
-                    listaReproduccion.agregarAlFinal(*actual);
-                }
-                if (!registroTotal.avanzar()) break;
-            }
-            reproduciendo = true;
-            guardarEstado();
-            std::cout << "Reproduciendo: " << cancionSeleccionada->getNombre() << " - "
-                      << cancionSeleccionada->getArtista() << "\n";
-        } else {
-            std::cout << "Selección fuera de rango.\n";
+        // Si no se ingresó texto, se vuelve al menú principal.
+        if (termino.empty()) {
+            return;
         }
-    } catch (const std::exception&) {
-        std::cout << "Entrada inválida. Use un número válido o V.\n";
+
+        int cantidadResultados = 0;
+        Cancion** resultados = buscarCancionesPorTermino(termino, cantidadResultados);
+
+        if (cantidadResultados == 0) {
+            std::cout << "\nNo se encontraron canciones ni artistas que contengan \""
+                      << termino << "\".\n";
+            std::cout << "Presione Enter para volver a intentar, o escriba V para volver al menú: ";
+            std::string respuesta;
+            std::getline(std::cin, respuesta);
+            if (!respuesta.empty() && (respuesta[0] == 'V' || respuesta[0] == 'v')) {
+                delete[] resultados;
+                return;
+            }
+            delete[] resultados;
+            continue;
+        }
+
+        std::cout << "\nBusqueda de canciones\n";
+        std::cout << "Canciones que contienen \"" << termino << "\":\n";
+        for (int i = 0; i < cantidadResultados; ++i) {
+            std::cout << " " << (i + 1) << ". " << resultados[i]->getNombre()
+                      << " - " << resultados[i]->getArtista() << "\n";
+        }
+
+        std::cout << "\nOpciones:\n";
+        std::cout << "R<num> - Reproducir canción seleccionada\n";
+        std::cout << "A<num> - Agregar canción seleccionada al final de la lista de reproducción actual\n";
+        std::cout << "F - Repetir búsqueda con un texto diferente\n";
+        std::cout << "V - Volver al menú principal\n";
+        std::cout << "Ingrese opción: ";
+
+        std::string opcion;
+        std::getline(std::cin, opcion);
+
+        if (opcion.empty()) {
+            delete[] resultados;
+            continue;
+        }
+
+        char letra = static_cast<char>(std::toupper(static_cast<unsigned char>(opcion[0])));
+
+        if (letra == 'V') {
+            seguirBuscando = false;
+        } else if (letra == 'F') {
+            // No hace nada más: el while vuelve a pedir un texto nuevo.
+        } else if (letra == 'R' || letra == 'A') {
+            try {
+                int num = std::stoi(opcion.substr(1));
+                if (num >= 1 && num <= cantidadResultados) {
+                    Cancion* seleccionada = resultados[num - 1];
+                    if (letra == 'R') {
+                        reproducirCancionEspecifica(*seleccionada);
+                        std::cout << "\nReproduciendo: " << seleccionada->getNombre()
+                                  << " - " << seleccionada->getArtista() << "\n";
+                    } else {
+                        listaReproduccion.agregarAlFinal(*seleccionada);
+                        std::cout << "\nCanción agregada al final de la lista de reproducción.\n";
+                    }
+                    guardarEstado();
+                } else {
+                    std::cout << "\nNúmero fuera de rango.\n";
+                }
+            } catch (const std::exception&) {
+                std::cout << "\nOpción inválida. Use el formato R<num> o A<num> (ej. R2).\n";
+            }
+            seguirBuscando = false;
+        } else {
+            std::cout << "\nOpción inválida.\n";
+            seguirBuscando = false;
+        }
+
+        delete[] resultados;
     }
 }
 
