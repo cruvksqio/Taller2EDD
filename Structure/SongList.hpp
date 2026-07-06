@@ -185,6 +185,20 @@ public:
         return nullptr;
     }
 
+    // Método para mover "actual" hacia el nodo cuyo dato tiene el ID indicado
+    // (útil cuando la lista fue mezclada y ya no se conoce la posición).
+    bool saltarPorId(int id) {
+        Nodo<T>* temp = cabeza;
+        while (temp != nullptr) {
+            if (temp->dato.getId() == id) {
+                actual = temp;
+                return true;
+            }
+            temp = temp->siguiente;
+        }
+        return false;
+    }
+
     // Método para eliminar por posición
     bool eliminarPorPosicion(int posicion) {
         if (posicion < 1 || posicion > longitud) {

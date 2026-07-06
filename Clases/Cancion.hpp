@@ -12,6 +12,7 @@ private:
     int anio;
     int duracion; // en segundos
     std::string ruta;
+    int reproducciones; // contador para el ranking TOP 10 (Heap)
 
 public:
     Cancion();
@@ -26,6 +27,7 @@ public:
     int getAnio() const;
     int getDuracion() const;
     std::string getRuta() const;
+    int getReproducciones() const;
 
     // Setters (añadir setId)
     void setId(int id);
@@ -35,6 +37,11 @@ public:
     void setAnio(int anio);
     void setDuracion(int duracion);
     void setRuta(std::string ruta);
+    void setReproducciones(int reproducciones);
+
+    // Suma 1 al contador de reproducciones (se llama cada vez que la
+    // canción empieza a sonar).
+    void incrementarReproducciones();
 
     void imprimirDatos() const;
     std::string toString() const; // Para guardar en archivos
