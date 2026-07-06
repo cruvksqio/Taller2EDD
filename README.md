@@ -27,7 +27,7 @@ playTracker es un reproductor de música por línea de comandos construido en C+
 
 ## Diagrama de Clases
 
-![Diagrama de Clases](diagrama_taller_edd_1.png)
+![Diagrama de Clases](diagrama_taller_edd_2.png)
 
 (Stack hecho manualmente sin librerias STL)
 
@@ -41,8 +41,8 @@ Compilador adecuado instalado en el sistema (ej. g++ para C++).
 Terminal o consola de comandos.
 
 **Pasos para Compilar:**
-1.  Clona el repositorio: `git clone https://github.com/cruvksqio/Taller1EDD.git`
-2.  Entra al directorio del proyecto: `cd Taller1EDD`
+1.  Clona el repositorio: `git clone https://github.com/cruvksqio/Taller2EDD.git`
+2.  Entra al directorio del proyecto: `cd Taller2EDD`
 3.  Crea y entra a la carpeta de compilación: `mkdir build && cd build`
 4.  Genera los archivos de construcción con CMake: `cmake ..`
 5.  Compila el proyecto: `cmake --build .`
